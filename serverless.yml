@@ -1,0 +1,311 @@
+#
+# Copyright 2017-2017 Mutual of Enumclaw. All Rights Reserved.
+# License: Public
+#
+service: ${opt:prefix, 'orchestrator'}-${self:custom.activity}
+
+plugins:
+  - serverless-webpack
+  - serverless-iam-roles-per-function
+  - serverless-pseudo-parameters
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-west-2'}
+  versionFunctions: false
+  environment:
+    epsagonToken: ${opt:epsagon-token, ''}
+    epsagonAppName: ${opt:epsagon-app-name, ''}
+    epsagonMetadata: ${opt:epsagon-meta, ''}
+    statusTable: ${self:custom.core.tables.status.name}
+    pluginTable: ${self:custom.core.tables.plugin.name}
+    activity: ${self:custom.activity}
+
+custom:
+  activity: ${opt:activity, 'activity'}
+
+  core:
+    stack: ${opt:core-stack, 'orchestrator'}
+    tables:
+      status:
+        name:
+          Fn::ImportValue: ${self:custom.core.stack}-${self:provider.stage}-status-name
+        arn:
+          Fn::ImportValue: ${self:custom.core.stack}-${self:provider.stage}-status-arn
+        stream:
+          Fn::ImportValue: ${self:custom.core.stack}-${self:provider.stage}-status-stream-arn
+      plugin:
+        name:
+          Fn::ImportValue: ${self:custom.core.stack}-${self:provider.stage}-plugin-name
+        arn:
+          Fn::ImportValue: ${self:custom.core.stack}-${self:provider.stage}-plugin-arn
+
+  webpack:
+    includeModules:
+      forceExclude:
+
+functions:
+  asyncStart:
+    handler: src/functions/asyncStage.fanOut
+    environment:
+      snsTopic:
+        Ref: snsTopic
+    iamRoleStatementsName: ${self:service}-${self:provider.stage}-as-${self:provider.region}-IAM
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+          - sns:Publish
+          - sns:ListSubscriptionsByTopic
+          - dynamodb:GetItem
+        Resource:
+          - ${self:custom.core.tables.status.arn}
+          - Ref: snsTopic
+
+  sncPreProc:
+    handler: src/functions/syncStage.start
+    environment:
+      stage: pre
+    iamRoleStatementsName: ${self:service}-${self:provider.stage}-pre-${self:provider.region}-IAM
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+        Resource:
+          - ${self:custom.core.tables.status.arn}
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+          - dynamodb:PutItem
+          - dynamodb:DeleteItem
+        Resource:
+          - ${self:custom.core.tables.plugin.arn}
+      - Effect: Allow
+        Action:
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+        Resource:
+          - arn:aws:logs:${self:provider.region}:#{AWS::AccountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-syncPre*
+
+  sncPostProc:
+    handler: src/functions/syncStage.start
+    environment:
+      stage: post
+    iamRoleStatementsName: ${self:service}-${self:provider.stage}-post-${self:provider.region}-IAM
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+          - dynamodb:GetItem
+        Resource:
+          - ${self:custom.core.tables.status.arn}
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+          - dynamodb:PutItem
+          - dynamodb:DeleteItem
+        Resource:
+          - ${self:custom.core.tables.plugin.arn}
+      - Effect: Allow
+        Action:
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+        Resource:
+          - arn:aws:logs:${self:provider.region}:#{AWS::AccountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-syncPost*
+
+  syncPrePluginAdd:
+    handler: src/functions/pluginAdd.handler
+    environment:
+      stage: pre
+    role:
+      Fn::GetAtt: 
+        - SncPreProcIamRoleLambdaExecution
+        - Arn
+    events:
+      - cloudwatchEvent:
+          event:
+            source:
+              - "aws.sns"
+            detail-type:
+              - AWS API Call via CloudTrail
+            detail:
+              eventSource:
+                - sns.amazonaws.com
+              eventName:
+                - Subscribe
+              requestParameters:
+                topicArn:
+                  - Ref: preTopic
+                protocol: 
+                  - lambda
+
+  syncPrePluginRemove:
+    handler: src/functions/pluginRemove.handler
+    environment:
+      stage: pre
+      snsArn:
+        Ref: preTopic
+    role:
+      Fn::GetAtt: 
+        - SncPreProcIamRoleLambdaExecution
+        - Arn
+    events:
+      - cloudwatchEvent:
+          event:
+            source:
+              - "aws.sns"
+            detail-type:
+              - AWS API Call via CloudTrail
+            detail:
+              eventSource:
+                - sns.amazonaws.com
+              eventName:
+                - Unsubscribe
+
+  syncPostPluginAdd:
+    handler: src/functions/pluginAdd.handler
+    environment:
+      stage: post
+    role:
+      Fn::GetAtt: 
+        - SncPostProcIamRoleLambdaExecution
+        - Arn
+    events:
+      - cloudwatchEvent:
+          event:
+            source:
+              - "aws.sns"
+            detail-type:
+              - AWS API Call via CloudTrail
+            detail:
+              eventSource:
+                - sns.amazonaws.com
+              eventName:
+                - Subscribe
+              requestParameters:
+                topicArn:
+                  - Ref: postTopic
+                protocol: 
+                  - lambda
+
+  syncPostPluginRemove:
+    handler: src/functions/pluginRemove.handler
+    environment:
+      stage: post
+      snsArn:
+        Ref: postTopic
+    role:
+      Fn::GetAtt: 
+        - SncPostProcIamRoleLambdaExecution
+        - Arn
+    events:
+      - cloudwatchEvent:
+          event:
+            source:
+              - "aws.sns"
+            detail-type:
+              - AWS API Call via CloudTrail
+            detail:
+              eventSource:
+                - sns.amazonaws.com
+              eventName:
+                - Unsubscribe
+
+resources:
+  Resources:
+    snsTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: ${self:service}-${self:provider.stage}-async
+        TopicName: ${self:service}-${self:provider.stage}-async
+
+    preTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: ${self:service}-${self:provider.stage}-pre-sync
+        TopicName: ${self:service}-${self:provider.stage}-pre-sync
+    postTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: ${self:service}-${self:provider.stage}-post-sync
+        TopicName: ${self:service}-${self:provider.stage}-post-sync
+
+  Outputs:
+    preProcessing:
+      Value:
+        Ref: preTopic
+      Export:
+        Name: ${self:service}-${self:provider.stage}-pre-processing
+
+    parallelProcessing:
+      Value:
+        Ref: snsTopic
+      Export:
+        Name: ${self:service}-${self:provider.stage}-parallel-processing
+
+    parallelProcessingName:
+      Value:
+        Fn::GetAtt:
+          - snsTopic
+          - TopicName
+      Export:
+        Name: ${self:service}-${self:provider.stage}-parallel-processing-name
+
+    postProcessing:
+      Value:
+        Ref: postTopic
+      Export:
+        Name: ${self:service}-${self:provider.stage}-post-processing
+
+    asyncStart:
+      Value: 
+        Fn::GetAtt: 
+          - AsyncStartLambdaFunction
+          - Arn
+      Export:
+        Name: ${self:service}-${self:provider.stage}-async
+    
+    syncPreProcessing:
+      Value: 
+        Fn::GetAtt: 
+          - SncPreProcLambdaFunction
+          - Arn
+      Export:
+        Name: ${self:service}-${self:provider.stage}-pre-sync
+
+    syncPostProcessing:
+      Value: 
+        Fn::GetAtt: 
+          - SncPostProcLambdaFunction
+          - Arn
+      Export:
+        Name: ${self:service}-${self:provider.stage}-post-sync
+
+    syncPreProcessingRole:
+      Value: 
+        Fn::GetAtt: 
+          - SncPreProcIamRoleLambdaExecution
+          - Arn
+      Export:
+        Name: ${self:service}-${self:provider.stage}-pre-process-arn
+        
+    syncPreProcessingRoleName:
+      Value: 
+        Ref: SncPreProcIamRoleLambdaExecution
+      Export:
+        Name: ${self:service}-${self:provider.stage}-pre-process-name
+    syncPostProcessingRole:
+      Value: 
+        Fn::GetAtt: 
+          - SncPostProcIamRoleLambdaExecution
+          - Arn
+      Export:
+        Name: ${self:service}-${self:provider.stage}-post-process-arn
+    syncPostProcessingRoleName:
+      Value: 
+        Ref: SncPostProcIamRoleLambdaExecution
+      Export:
+        Name: ${self:service}-${self:provider.stage}-post-process-name
