@@ -9,7 +9,7 @@
     "scripts": {
         "prebuild": "npm run build:links && npm run lt",
         "build": "npm run package",
-        "postbuild": "mv .serverless/activity-orchestrator.zip ./",
+        "postbuild": "mv .serverless/orchestrator-activity.zip ./",
         "build:links": "npm link jest typescript aws-sdk",
         "test": "npx jest",
         "test:coverage": "npm run test -- --coverage",
@@ -22,7 +22,7 @@
         "deploy": "npx sls deploy"
     },
     "dependencies": {
-        "@moe-tech/orchestrator": "^1.0.42",
+        "@moe-tech/orchestrator": "^1.0.45",
         "aws-sdk": "2.441.0",
         "epsagon": "1.17.3"
     },
@@ -44,7 +44,7 @@
         "ts-loader": "^4.5.0",
         "tslint": "^5.18.0",
         "typescript": "^3.5.3",
-        "webpack": "^4.38.0",
+        "webpack": "^4.39.0",
         "webpack-node-externals": "^1.7.2"
     }
 }
