@@ -89,6 +89,10 @@ functions:
           - logs:PutLogEvents
         Resource:
           - arn:aws:logs:${self:provider.region}:#{AWS::AccountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-syncPre*
+      - Effect: Allow
+        Action:
+          - lambda:InvokeFunction
+        Resource: "*"
 
   sncPostProc:
     handler: src/functions/syncStage.start
@@ -115,6 +119,10 @@ functions:
           - logs:PutLogEvents
         Resource:
           - arn:aws:logs:${self:provider.region}:#{AWS::AccountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-syncPost*
+      - Effect: Allow
+        Action:
+          - lambda:InvokeFunction
+        Resource: "*"
 
   syncPrePluginAdd:
     handler: src/functions/pluginAdd.handler
