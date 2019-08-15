@@ -66,6 +66,7 @@ functions:
 
   sncPreProc:
     handler: src/functions/syncStage.start
+    timeout: 900
     environment:
       stage: pre
     iamRoleStatementsName: ${self:service}-${self:provider.stage}-pre-${self:provider.region}-IAM
@@ -96,6 +97,7 @@ functions:
 
   sncPostProc:
     handler: src/functions/syncStage.start
+    timeout: 900
     environment:
       stage: post
     iamRoleStatementsName: ${self:service}-${self:provider.stage}-post-${self:provider.region}-IAM
