@@ -23,6 +23,8 @@ provider:
     pluginTable: ${self:custom.core.tables.plugin.name}
     activity: ${self:custom.activity}
 
+  stackTags: ${file(./${opt:tagConfig, 'default-tags.yml'})}
+
 custom:
   activity: ${opt:activity, 'activity'}
 
