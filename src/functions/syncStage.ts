@@ -84,17 +84,19 @@ export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowSt
         // Execute all
         //
         
-    console.log('Retrieving status object');
-    const overallStatus = await statusDal.getStatusObject(event.uid, event.metadata.workflow);
+        console.log('Retrieving status object');
+        const overallStatus = await statusDal.getStatusObject(event.uid, event.metadata.workflow);
 
-    if (!overallStatus) {
-        throw new Error('The status object cannot be found');
-    }
+        if (!overallStatus) {
+            throw new Error('The status object cannot be found');
+        }
 
-    const statusObject = overallStatus.activities[activity];
-    if (!statusObject) {
-        throw new Error('The orchistration id has not been provisioned');
-    }
+        if (!overallStatus.activities[activity]) {
+            throw new Error('The orchistration id has not been provisioned');
+        }
+        const statusObject = {};
+        statusObject[activity] = overallStatus.activities[activity];
+
         const globalMetadata = {
             now: new Date().getTime(),
             ...event.metadata,
@@ -102,8 +104,9 @@ export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowSt
         } as any;
         const message = {
             orchestratorId: process.env.orchestratorId,
-            status: statusObject,
+            status: overallStatus.status,
             activity,
+            activities: statusObject,
             stage,
             ...globalMetadata
         };
@@ -154,10 +157,13 @@ export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowSt
                 }
             } while (error != null && retryCount < 3);
             if(error) {
-                await statusDal.updatePluginStatus(event.uid, event.workflow, activity, stage,
-                                             plugin.mandatory, plugin.pluginName, OrchestratorComponentState.Error,
+                await statusDal.updatePluginStatus(
+                                             event.uid, event.workflow, activity, stage,
+                                             plugin.mandatory, plugin.pluginName, 
+                                             OrchestratorComponentState.Error,
                                              error.message);
-                await statusDal.updateStageStatus(event.uid, event.workflow, activity, stage, 
+                await statusDal.updateStageStatus(
+                                            event.uid, event.workflow, activity, stage, 
                                             OrchestratorComponentState.Error, error.message);
                 throw error;
             }

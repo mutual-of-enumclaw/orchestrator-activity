@@ -63,10 +63,12 @@ export const fanOut = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowS
         throw new Error('The status object cannot be found');
     }
 
-    const statusObject = overallStatus.activities[activity];
-    if (!statusObject) {
+    if (!overallStatus.activities[activity]) {
         throw new Error('The orchistration id has not been provisioned');
     }
+
+    const statusObject = {};
+    statusObject[activity] = overallStatus.activities[activity];
 
     const globalMetadata = {
         now: new Date().getTime(),
@@ -77,8 +79,9 @@ export const fanOut = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowS
     const result = await sns.publishWithMetadata(
         {
             orchestratorId: process.env.orchestratorId,
-            status: statusObject,
+            status: overallStatus.status,
             activity,
+            activities: statusObject,
             stage: OrchestratorStage.BulkProcessing,
             ...globalMetadata
         },
