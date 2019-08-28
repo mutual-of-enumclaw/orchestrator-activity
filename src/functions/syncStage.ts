@@ -157,10 +157,13 @@ export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowSt
                 }
             } while (error != null && retryCount < 3);
             if(error) {
-                await statusDal.updatePluginStatus(event.uid, event.workflow, activity, stage,
-                                             plugin.mandatory, plugin.pluginName, OrchestratorComponentState.Error,
+                await statusDal.updatePluginStatus(
+                                             event.uid, event.workflow, activity, stage,
+                                             plugin.mandatory, plugin.pluginName, 
+                                             OrchestratorComponentState.Error,
                                              error.message);
-                await statusDal.updateStageStatus(event.uid, event.workflow, activity, stage, 
+                await statusDal.updateStageStatus(
+                                            event.uid, event.workflow, activity, stage, 
                                             OrchestratorComponentState.Error, error.message);
                 throw error;
             }
