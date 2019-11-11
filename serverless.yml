@@ -24,7 +24,8 @@ provider:
     activity: ${self:custom.activity}
 
   stackTags: ${file(./${opt:tagConfig, 'default-tags.yml'})}
-
+  deploymentBucket: ${opt:deploymentBucket, ''}
+  
 custom:
   activity: ${opt:activity, 'activity'}
 
