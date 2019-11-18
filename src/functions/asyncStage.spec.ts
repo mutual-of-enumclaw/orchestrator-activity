@@ -3,33 +3,40 @@
  * License: Public
  */
 
-import { fanOut, setDal, setSns, setActivityId } from './asyncStage';
+import { fanOut, setDal, setSns, setActivityId, setStepFunction } from './asyncStage';
 import { MockSNSUtils, OrchestratorStatusDal } from '../../__mock__/libServices';
 import { OrchestratorComponentState } from '@moe-tech/orchestrator';
-
+import { MockStepFunctions } from '../../__mock__/aws';
 
 const sns = new MockSNSUtils();
 const dal = new OrchestratorStatusDal();
-
+const stepfunctions = new MockStepFunctions();
 describe('fanOut', () => {
     process.env.environment = 'unit-test';
     setActivityId('test');
     setDal(dal as any);
     setSns(sns as any);
+    setStepFunction(stepfunctions as any);
+
+    beforeEach(() => {
+        stepfunctions.reset();
+    });
+    
     test('Null Event', async () => {
         let error = null;
         try {
-            await fanOut(null);
+            await fanOut({ data: null, asyncToken: 'token'});
         } catch (err) {
             error = err.message;
         }
 
-        expect(error).toBe('Event data unexpected');
+        expect(error).toBe('Async event data not recieved');
     });
+
     test('No uid', async () => {
         let error = null;
         try {
-            await fanOut({});
+            await fanOut({ data: {}, asyncToken: 'token'});
         } catch (err) {
             error = err.message;
         }
@@ -51,7 +58,15 @@ describe('fanOut', () => {
         sns.subscriberCount = 1;
         dal.getStatusObjectResult = {
             activities: {
-                test: {}
+                test: {
+                    async: {
+                        mandatory: {},
+                        optional: {},
+                        status: {
+                            state: OrchestratorComponentState.InProgress
+                        }
+                    }
+                }
             }
         };
         const result = await fanOut(getDefaultEvent());
@@ -89,10 +104,13 @@ describe('fanOut', () => {
 
 function getDefaultEvent() {
     return {
-        uid: 'uid', workflow: 'issue', company: 'company', lineOfBusiness: 'lob', riskState: 'state',
-        effectiveDate: 1, policies: [{ id: 'test' }], metadata: {
-            workflow: 'issue'
-        }
+        data: {
+            uid: 'uid', workflow: 'issue', company: 'company', lineOfBusiness: 'lob', riskState: 'state',
+            effectiveDate: 1, policies: [{ id: 'test' }], metadata: {
+                workflow: 'issue'
+            }
+        },
+        asyncToken: 'token'
     };
 }
 

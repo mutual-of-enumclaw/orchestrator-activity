@@ -169,3 +169,20 @@ export class MockSNS {
         };
     }
 }
+
+export class MockStepFunctions {
+    sendTaskSuccess = jest.fn();
+
+    reset() {
+        this.sendTaskSuccess.mockReset();
+        this.sendTaskSuccess.mockImplementation((input) => {
+            return {
+                promise: () => {
+                    return new Promise((resolve) => {
+                        resolve();
+                    });
+                }
+            }
+        });
+    }
+}
