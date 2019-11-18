@@ -66,6 +66,10 @@ functions:
         Resource:
           - ${self:custom.core.tables.status.arn}
           - Ref: snsTopic
+      - Effect: Allow
+        Action:
+          - states:SendTaskSuccess
+        Resource: '*'
 
   sncPreProc:
     handler: src/functions/syncStage.start
@@ -280,6 +284,12 @@ resources:
           - Arn
       Export:
         Name: ${self:service}-${self:provider.stage}-async
+
+    asyncStartName:
+      Value: 
+        Ref: AsyncStartLambdaFunction
+      Export:
+        Name: ${self:service}-${self:provider.stage}-async-name
     
     syncPreProcessing:
       Value: 
