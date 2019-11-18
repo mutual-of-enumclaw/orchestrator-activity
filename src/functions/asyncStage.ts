@@ -17,6 +17,13 @@ let dal: OrchestratorStatusDal;
 let stepfunctions = new StepFunctions();
 let activity: string = process.env.activity;
 
+export function setStepFunction(value: StepFunctions) {
+    if (process.env.environment !== 'unit-test') {
+        throw new Error('A unit test modification is being used outside of the indended environment');
+    }
+    stepfunctions = value;
+}
+
 export function setActivityId(obj: string) {
     if (process.env.environment !== 'unit-test') {
         throw new Error('A unit test modification is being used outside of the indended environment');
@@ -41,7 +48,7 @@ export function setDal(obj: OrchestratorStatusDal) {
 interface AsyncParameters {
     data: OrchestratorWorkflowStatus,
     asyncToken: string
-};
+}
 
 export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters) => {
     if (!sns || !dal) {
@@ -114,9 +121,11 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
     console.log(`publishWithMetadata result: ${JSON.stringify(result)}`);
 
     await new Promise((resolve) => {
-        setTimeout(() => {
-            resolve();
-        }, 500);
+        setTimeout(
+            () => {
+                resolve();
+            }, 
+            500);
     });
 
     const updatedStatus = await dal.getStatusObject(event.uid, event.workflow, true);
