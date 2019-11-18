@@ -8,11 +8,13 @@ import { OrchestratorComponentState, OrchestratorStage, stepLambdaAsyncWrapper, 
     from '@moe-tech/orchestrator';
 import { SNSUtils } from '../utils/snsUtils';
 import { install } from 'source-map-support';
+import { StepFunctions } from 'aws-sdk';
 
 install();
 
 let sns: SNSUtils;
 let dal: OrchestratorStatusDal;
+let stepfunctions = new StepFunctions();
 let activity: string = process.env.activity;
 
 export function setActivityId(obj: string) {
@@ -36,12 +38,22 @@ export function setDal(obj: OrchestratorStatusDal) {
     dal = obj;
 }
 
-export const fanOut = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowStatus) => {
+interface AsyncParameters {
+    data: OrchestratorWorkflowStatus,
+    asyncToken: string
+};
+
+export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters) => {
     if (!sns || !dal) {
         sns = new SNSUtils(process.env.snsTopic);
         dal = new OrchestratorStatusDal(process.env.statusTable, activity);
     }
+    
+    if(!asyncEvent || !asyncEvent.asyncToken || !asyncEvent.data) {
+        throw new Error('Async event data not recieved');
+    }
 
+    const event = asyncEvent.data;
     if (!event) {
         throw new Error('Event data unexpected');
     }
@@ -50,9 +62,16 @@ export const fanOut = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowS
     }
 
     if (await sns.getSubscriberCount() === 0) {
+        console.log('No subscribers, updating status and returning');
+        await stepfunctions.sendTaskSuccess({
+            output: JSON.stringify(OrchestratorComponentState.Complete),
+            taskToken: asyncEvent.asyncToken
+        }).promise();
+
         await dal.updateStageStatus(
             event.uid, event.workflow, activity, OrchestratorStage.BulkProcessing,
             OrchestratorComponentState.Complete, ' ');
+
         return OrchestratorComponentState.Complete;
     }
 
@@ -76,6 +95,12 @@ export const fanOut = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowS
         uid: event.uid
     } as any;
 
+    console.log('Setting activity state to in progress');
+    const startTime = new Date();
+    await dal.updateStageStatus(
+        event.uid, event.workflow, activity, OrchestratorStage.BulkProcessing,
+        OrchestratorComponentState.InProgress, ' ', startTime, asyncEvent.asyncToken);
+
     const result = await sns.publishWithMetadata(
         {
             orchestratorId: process.env.orchestratorId,
@@ -88,10 +113,24 @@ export const fanOut = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowS
         globalMetadata);
     console.log(`publishWithMetadata result: ${JSON.stringify(result)}`);
 
-    console.log('Setting activity state to in progress');
-    dal.updateStageStatus(
-        event.uid, event.workflow, activity, OrchestratorStage.BulkProcessing,
-        OrchestratorComponentState.InProgress, ' ');
+    await new Promise((resolve) => {
+        setTimeout(() => {
+            resolve();
+        }, 500);
+    });
+
+    const updatedStatus = await dal.getStatusObject(event.uid, event.workflow, true);
+
+    if(Object.keys(updatedStatus.activities[activity].async.mandatory).length === 0) {
+        console.log('No plugins registered, performing update to move task forward');
+        await dal.updateStageStatus(
+            event.uid, event.workflow, activity, OrchestratorStage.BulkProcessing,
+            OrchestratorComponentState.Complete, ' ', startTime, ' ');
+        await stepfunctions.sendTaskSuccess({
+            output: JSON.stringify(OrchestratorComponentState.Complete),
+            taskToken: asyncEvent.asyncToken
+        }).promise();
+    }
 
     return OrchestratorComponentState.InProgress;
 });
