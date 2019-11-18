@@ -22,14 +22,14 @@
         "deploy": "npx sls deploy"
     },
     "dependencies": {
-        "@moe-tech/orchestrator": "^1.0.45",
+        "@moe-tech/orchestrator": "^1.0.54",
         "aws-sdk": "2.441.0",
         "epsagon": "1.17.3"
     },
     "devDependencies": {
         "@types/aws-lambda": "8.10.11",
         "@types/jest": "^23.3.14",
-        "@types/node": "^8.10.51",
+        "@types/node": "^8.10.59",
         "aws-sdk-mock": "^4.5.0",
         "hard-source-webpack-plugin": "^0.13.1",
         "jest": "24.7.1",
@@ -38,13 +38,13 @@
         "serverless-iam-roles-per-function": "^1.0.4",
         "serverless-plugin-include-dependencies": "^3.2.1",
         "serverless-plugin-tracing": "^2.0.0",
-        "serverless-pseudo-parameters": "^2.4.0",
+        "serverless-pseudo-parameters": "^2.5.0",
         "serverless-webpack": "^5.3.1",
-        "ts-jest": "^24.0.2",
+        "ts-jest": "^24.1.0",
         "ts-loader": "^4.5.0",
-        "tslint": "^5.18.0",
-        "typescript": "^3.5.3",
-        "webpack": "^4.39.0",
+        "tslint": "^5.20.1",
+        "typescript": "^3.7.2",
+        "webpack": "^4.41.2",
         "webpack-node-externals": "^1.7.2"
     }
 }
