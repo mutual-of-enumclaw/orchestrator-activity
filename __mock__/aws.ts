@@ -182,7 +182,7 @@ export class MockStepFunctions {
                         resolve();
                     });
                 }
-            }
+            };
         });
     }
 }
