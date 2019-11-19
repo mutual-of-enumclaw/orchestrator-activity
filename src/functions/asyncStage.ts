@@ -4,7 +4,7 @@
  */
 
 import { OrchestratorComponentState, OrchestratorStage, stepLambdaAsyncWrapper, OrchestratorStatusDal, 
-    OrchestratorWorkflowStatus }
+    OrchestratorWorkflowStatus, getPluginRegisterTimeout }
     from '@moe-tech/orchestrator';
 import { SNSUtils } from '../utils/snsUtils';
 import { install } from 'source-map-support';
@@ -120,12 +120,13 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
         globalMetadata);
     console.log(`publishWithMetadata result: ${JSON.stringify(result)}`);
 
+    const timeout = getPluginRegisterTimeout(overallStatus, activity);
     await new Promise((resolve) => {
         setTimeout(
             () => {
                 resolve();
             }, 
-            500);
+            timeout);
     });
 
     const updatedStatus = await dal.getStatusObject(event.uid, event.workflow, true);

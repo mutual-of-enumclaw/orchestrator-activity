@@ -22,7 +22,7 @@
         "deploy": "npx sls deploy"
     },
     "dependencies": {
-        "@moe-tech/orchestrator": "^1.0.54",
+        "@moe-tech/orchestrator": "^1.0.56",
         "aws-sdk": "2.441.0",
         "epsagon": "1.17.3"
     },
