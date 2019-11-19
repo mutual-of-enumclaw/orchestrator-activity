@@ -65,9 +65,10 @@ describe('fanOut', () => {
                         status: {
                             state: OrchestratorComponentState.InProgress
                         }
-                    }
+                    },
+                    pluginRegisterTimeout: 10
                 }
-            }
+            },
         };
         const result = await fanOut(getDefaultEvent());
 
