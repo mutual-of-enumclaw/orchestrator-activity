@@ -136,10 +136,17 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
         await dal.updateStageStatus(
             event.uid, event.workflow, activity, OrchestratorStage.BulkProcessing,
             OrchestratorComponentState.Complete, ' ', startTime, ' ');
-        await stepfunctions.sendTaskSuccess({
-            output: JSON.stringify(OrchestratorComponentState.Complete),
-            taskToken: asyncEvent.asyncToken
-        }).promise();
+        
+        try {
+            await stepfunctions.sendTaskSuccess({
+                output: JSON.stringify(OrchestratorComponentState.Complete),
+                taskToken: asyncEvent.asyncToken
+            }).promise();
+        } catch (err) {
+            if(err.message !== "Task Timed Out: 'Provided task does not exist anymore'") {
+                throw err;
+            }
+        }
     }
 
     return OrchestratorComponentState.InProgress;
