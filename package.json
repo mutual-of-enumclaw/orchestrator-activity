@@ -22,8 +22,8 @@
         "deploy": "npx sls deploy"
     },
     "dependencies": {
-        "@moe-tech/orchestrator": "^1.0.56",
-        "aws-sdk": "2.441.0",
+        "@moe-tech/orchestrator": "^1.0.57",
+        "aws-sdk": "^2.612.0",
         "epsagon": "1.17.3"
     },
     "devDependencies": {
@@ -34,17 +34,17 @@
         "hard-source-webpack-plugin": "^0.13.1",
         "jest": "24.7.1",
         "jest-junit": "^7.0.0",
-        "serverless": "1.49.0",
+        "serverless": "^1.63.0",
         "serverless-iam-roles-per-function": "^1.0.4",
         "serverless-plugin-include-dependencies": "^3.2.1",
         "serverless-plugin-tracing": "^2.0.0",
         "serverless-pseudo-parameters": "^2.5.0",
         "serverless-webpack": "^5.3.1",
-        "ts-jest": "^24.1.0",
-        "ts-loader": "^4.5.0",
+        "ts-jest": "^24.3.0",
+        "ts-loader": "^6.2.1",
         "tslint": "^5.20.1",
-        "typescript": "^3.7.2",
-        "webpack": "^4.41.2",
+        "typescript": "^3.7.5",
+        "webpack": "^4.41.5",
         "webpack-node-externals": "^1.7.2"
     }
 }
