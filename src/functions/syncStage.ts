@@ -42,7 +42,7 @@ export function setLambda(obj: AWS.Lambda) {
 
 export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowStatus) => {
     if (!statusDal) {
-        statusDal = new OrchestratorStatusDal(process.env.statusTable, activity);
+        statusDal = new OrchestratorStatusDal(process.env.statusTable);
         pluginDal = new OrchestratorPluginDal(process.env.pluginTable, activity);
     }
     console.log(JSON.stringify(event));

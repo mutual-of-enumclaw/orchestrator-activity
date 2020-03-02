@@ -231,6 +231,55 @@ functions:
               eventName:
                 - Unsubscribe
 
+  parallelPluginAdd:
+    handler: src/functions/pluginAdd.handler
+    environment:
+      stage: parallel
+    role:
+      Fn::GetAtt: 
+        - SncPostProcIamRoleLambdaExecution
+        - Arn
+    events:
+      - cloudwatchEvent:
+          event:
+            source:
+              - "aws.sns"
+            detail-type:
+              - AWS API Call via CloudTrail
+            detail:
+              eventSource:
+                - sns.amazonaws.com
+              eventName:
+                - Subscribe
+              requestParameters:
+                topicArn:
+                  - Ref: snsTopic
+                protocol: 
+                  - lambda
+
+  parallelPluginRemove:
+    handler: src/functions/pluginRemove.handler
+    environment:
+      stage: parallel
+      snsArn:
+        Ref: snsTopic
+    role:
+      Fn::GetAtt: 
+        - SncPostProcIamRoleLambdaExecution
+        - Arn
+    events:
+      - cloudwatchEvent:
+          event:
+            source:
+              - "aws.sns"
+            detail-type:
+              - AWS API Call via CloudTrail
+            detail:
+              eventSource:
+                - sns.amazonaws.com
+              eventName:
+                - Unsubscribe
+
 resources:
   Resources:
     snsTopic:
