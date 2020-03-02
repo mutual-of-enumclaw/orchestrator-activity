@@ -7,7 +7,20 @@ import { CloudwatchEvent } from "../types/cloudwatchEvent";
 import { OrchestratorStage, lambdaWrapperAsync } from "@moe-tech/orchestrator";
 import { PluginManager } from "../utils/pluginManager";
 
-const stage = (process.env.stage === 'pre')? OrchestratorStage.PreProcessing : OrchestratorStage.PostProcessing;
+let stage: OrchestratorStage;
+
+switch(process.env.stage) {
+    case 'pre':
+        stage = OrchestratorStage.PreProcessing;
+        break;
+    case 'post':
+        stage = OrchestratorStage.PostProcessing
+        break;
+    case 'parallel':
+        stage = OrchestratorStage.BulkProcessing;
+        break;
+}
+
 const pluginRemoveManager = new PluginManager(process.env.activity, stage, process.env.snsArn);
 export const handler = lambdaWrapperAsync(async (event: CloudwatchEvent) => {
     console.log(JSON.stringify(event));

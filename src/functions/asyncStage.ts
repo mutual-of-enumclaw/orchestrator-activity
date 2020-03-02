@@ -53,7 +53,7 @@ interface AsyncParameters {
 export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters) => {
     if (!sns || !dal) {
         sns = new SNSUtils(process.env.snsTopic);
-        dal = new OrchestratorStatusDal(process.env.statusTable, activity);
+        dal = new OrchestratorStatusDal(process.env.statusTable);
     }
     
     if(!asyncEvent || !asyncEvent.asyncToken || !asyncEvent.data) {
