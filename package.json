@@ -7,12 +7,11 @@
     "description": "The orchestrator activity framework",
     "main": "handler.js",
     "scripts": {
-        "prebuild": "npm run build:links && npm run lt",
+        "prebuild": "npm run lt",
         "build": "npm run package",
         "postbuild": "mv .serverless/orchestrator-activity.zip ./",
-        "build:links": "npm link jest typescript aws-sdk",
-        "test": "npx jest",
-        "test:coverage": "npm run test -- --coverage",
+        "test": "jest",
+        "test:coverage": "npm test -- --coverage",
         "lint": "npx tslint -c tslint.json -p tsconfig.json",
         "lint:fix": "npx tslint -c tslint.json -p tsconfig.json --fix",
         "start": "./node_modules/.bin/serverless offline -s dev",
@@ -22,9 +21,10 @@
         "deploy": "npx sls deploy"
     },
     "dependencies": {
-        "@moe-tech/orchestrator": "^1.0.58",
+        "@moe-tech/orchestrator": "^1.0.61",
         "aws-sdk": "^2.612.0",
-        "epsagon": "1.17.3"
+        "epsagon": "1.17.3",
+        "xml2js": "^0.4.23"
     },
     "devDependencies": {
         "@types/aws-lambda": "8.10.11",
@@ -39,11 +39,11 @@
         "serverless-plugin-tracing": "^2.0.0",
         "serverless-pseudo-parameters": "^2.5.0",
         "serverless-webpack": "^5.3.1",
-        "ts-jest": "^24.3.0",
+        "ts-jest": "^25.2.1",
         "ts-loader": "^6.2.1",
         "tslint": "^5.20.1",
         "typescript": "^3.7.5",
-        "webpack": "^4.41.5",
+        "webpack": "^4.42.0",
         "webpack-node-externals": "^1.7.2"
     }
 }

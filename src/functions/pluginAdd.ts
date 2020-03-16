@@ -17,7 +17,7 @@ switch(process.env.stage) {
         stage = OrchestratorStage.PreProcessing;
         break;
     case 'post':
-        stage = OrchestratorStage.PostProcessing
+        stage = OrchestratorStage.PostProcessing;
         break;
     case 'parallel':
         stage = OrchestratorStage.BulkProcessing;
