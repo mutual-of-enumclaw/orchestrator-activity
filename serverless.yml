@@ -52,6 +52,7 @@ custom:
 functions:
   asyncStart:
     handler: src/functions/asyncStage.fanOut
+    timeout: 60
     environment:
       snsTopic:
         Ref: snsTopic
