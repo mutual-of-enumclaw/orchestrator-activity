@@ -4,7 +4,7 @@
  */
 
 import { OrchestratorComponentState, OrchestratorStage, stepLambdaAsyncWrapper, OrchestratorStatusDal, 
-    OrchestratorWorkflowStatus, getPluginRegisterTimeout }
+    OrchestratorWorkflowStatus, getPluginRegisterTimeout, OrchestratorActivityStatus }
     from '@moe-tech/orchestrator';
 import { SNSUtils } from '../utils/snsUtils';
 import { install } from 'source-map-support';
@@ -93,7 +93,7 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
         throw new Error('The orchistration id has not been provisioned');
     }
 
-    const statusObject = {};
+    const statusObject: {[key: string]: OrchestratorActivityStatus} = {};
     statusObject[activity] = overallStatus.activities[activity];
 
     const globalMetadata = {
@@ -108,16 +108,50 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
         event.uid, event.workflow, activity, OrchestratorStage.BulkProcessing,
         OrchestratorComponentState.InProgress, ' ', startTime, asyncEvent.asyncToken);
 
-    const result = await sns.publishWithMetadata(
-        {
+    let message = JSON.stringify({
+        orchestratorId: process.env.orchestratorId,
+        status: overallStatus.status,
+        activity,
+        activities: statusObject,
+        stage: OrchestratorStage.BulkProcessing,
+        ...globalMetadata
+    });
+    if(message.length * 2 > 256000) {
+        statusObject[activity].async.mandatory = {};
+        statusObject[activity].async.optional = {};
+        if(statusObject[activity].async.status) {
+            delete statusObject[activity].async.status.message;
+            delete statusObject[activity].async.status.token;
+        }
+        statusObject[activity].pre.mandatory = {};
+        statusObject[activity].pre.optional = {};
+        if(statusObject[activity].pre.status) {
+            delete statusObject[activity].async.status.message;
+            delete statusObject[activity].async.status.token;
+        }
+        statusObject[activity].post.mandatory = {};
+        statusObject[activity].post.optional = {};
+        if(statusObject[activity].post.status) {
+            delete statusObject[activity].async.status.message;
+            delete statusObject[activity].async.status.token;
+        }
+        
+        if(statusObject[activity].status) {
+            delete statusObject[activity].status.token;
+            delete statusObject[activity].status.message;
+        }
+
+        message = JSON.stringify({
             orchestratorId: process.env.orchestratorId,
             status: overallStatus.status,
             activity,
             activities: statusObject,
             stage: OrchestratorStage.BulkProcessing,
             ...globalMetadata
-        },
-        globalMetadata);
+        });
+    }
+
+    const result = await sns.publishWithMetadata(message, globalMetadata);
     console.log(`publishWithMetadata result: ${JSON.stringify(result)}`);
 
     const timeout = getPluginRegisterTimeout(overallStatus, activity);
