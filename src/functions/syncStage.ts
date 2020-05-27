@@ -144,6 +144,8 @@ export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowSt
 
                     if (result.FunctionError) {
                         throw new Error(result.FunctionError as string);
+                    } else if ((result.Payload && result.Payload.toString().match(/Error:.+/))) {
+                        throw new Error(result.Payload.toString());
                     }
                 } catch (err) {
                     error = err;
