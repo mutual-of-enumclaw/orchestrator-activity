@@ -97,10 +97,11 @@ functions:
           - logs:CreateLogStream
           - logs:PutLogEvents
         Resource:
-          - arn:aws:logs:${self:provider.region}:#{AWS::AccountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-syncPre*
+          - arn:aws:logs:${self:provider.region}:#{AWS::AccountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-*
       - Effect: Allow
         Action:
           - lambda:InvokeFunction
+          - sns:ListSubscriptionsByTopic
         Resource: "*"
 
   sncPostProc:
@@ -159,6 +160,83 @@ functions:
                   - Ref: preTopic
                 protocol: 
                   - lambda
+
+  refreshAllRegistrations:
+    handler: src/functions/refreshAllRegistrations.handler
+    environment:
+      preTopicArn:
+        Ref: preTopic
+      postTopicArn:
+        Ref: postTopic
+      parallelTopicArn:
+        Ref: snsTopic
+    role:
+      Fn::GetAtt: 
+        - SncPreProcIamRoleLambdaExecution
+        - Arn
+
+  syncPrePluginUpdate:
+    handler: src/functions/pluginUpdate.handler
+    environment:
+      stage: pre
+    role:
+      Fn::GetAtt: 
+        - SncPreProcIamRoleLambdaExecution
+        - Arn
+    events:
+      - cloudwatchEvent:
+          event:
+            source:
+              - aws.lambda
+            detail-type:
+              - AWS API Call via CloudTrail
+            detail:
+              eventSource:
+                - lambda.amazonaws.com
+              eventName: 
+                - UpdateFunctionCode20150331v2
+
+  syncPostPluginUpdate:
+    handler: src/functions/pluginUpdate.handler
+    environment:
+      stage: post
+    role:
+      Fn::GetAtt: 
+        - SncPreProcIamRoleLambdaExecution
+        - Arn
+    events:
+      - cloudwatchEvent:
+          event:
+            source:
+              - aws.lambda
+            detail-type:
+              - AWS API Call via CloudTrail
+            detail:
+              eventSource:
+                - lambda.amazonaws.com
+              eventName: 
+                - UpdateFunctionCode20150331v2
+
+  parallelPluginUpdate:
+    handler: src/functions/pluginUpdate.handler
+    environment:
+      stage: async
+    role:
+      Fn::GetAtt: 
+        - SncPreProcIamRoleLambdaExecution
+        - Arn
+    events:
+      - cloudwatchEvent:
+          event:
+            source:
+              - aws.lambda
+            detail-type:
+              - AWS API Call via CloudTrail
+            detail:
+              eventSource:
+                - lambda.amazonaws.com
+              eventName: 
+                - UpdateFunctionCode20150331v2
 
   syncPrePluginRemove:
     handler: src/functions/pluginRemove.handler

@@ -5,7 +5,6 @@
     "strictNullChecks": false,
     "sourceMap": true,
     "target": "es6",
-    // "outDir": ".build",
     "moduleResolution": "node",
     "module": "commonjs",
     "lib": [

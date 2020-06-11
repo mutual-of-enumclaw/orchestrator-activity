@@ -7,6 +7,7 @@ import { PluginManagementDal } from "./pluginManagementDal";
 import { OrchestratorStage } from "@moe-tech/orchestrator";
 import { CloudwatchEvent } from "../types/cloudwatchEvent";
 import { Lambda } from 'aws-sdk';
+import { Stage } from "aws-sdk/clients/amplify";
 
 interface LambdaResult {
     pluginName: string;
@@ -15,7 +16,7 @@ interface LambdaResult {
 }
 
 export class PluginManager {
-    private pluginDal: PluginManagementDal;
+    public pluginDal: PluginManagementDal;
     private lambda: Lambda;
 
     constructor(private activity: string, private stage: OrchestratorStage, private snsArn: string) {}
@@ -58,6 +59,15 @@ export class PluginManager {
         const lambdaName = lambdaArnParts[6];
         console.log('Lambda Name: ' + lambdaName);
 
+        await this.updateLambdaParams(lambdaName, event.detail.responseElements.subscriptionArn, this.stage);
+    }
+
+    public async updateLambdaParams(lambdaName: string, subscriptionArn: string, stage: Stage) {
+        if(!this.pluginDal) {
+            this.pluginDal = new PluginManagementDal(process.env.pluginTable, this.activity, this.stage);
+            this.lambda = new Lambda();
+        }
+        const pluginDal = this.pluginDal.stage === stage? this.pluginDal : new PluginManagementDal(process.env.pluginTable, this.activity, stage);
         console.log('Invoking Lambda');
         const lambdaResult = await this.lambda.invoke({
             FunctionName: lambdaName,
@@ -104,12 +114,12 @@ export class PluginManager {
         }
 
         console.log('Adding plugin to database');
-        await this.pluginDal.addPlugin(event.detail.responseElements.subscriptionArn, 
+        await pluginDal.addPlugin(subscriptionArn, 
                                        {functionName: lambdaName, ...result});
         console.log('Plugin add succeeded');
     }
 
-    private evaluateCloudwatchEvent(event: CloudwatchEvent) {
+    public evaluateCloudwatchEvent(event: CloudwatchEvent) {
         if(!event || !event.detail || !event.detail.requestParameters) {
             throw new Error('Argument event not valid');
         }
