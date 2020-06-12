@@ -33,7 +33,7 @@ export const handler = lambdaWrapperAsync(async () => {
         updateSubscriptions(process.env.preTopicArn, 'pre'),
         updateSubscriptions(process.env.postTopicArn, 'post'),
         updateSubscriptions(process.env.parallelTopicArn, 'async')
-    ])
+    ]);
 });
 
 async function updateSubscriptions(topicArn: string, stage: string) {

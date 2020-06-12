@@ -153,6 +153,7 @@ describe('processCloudwatchEvent', () => {
         lambda.invokeRetval = { Payload: '{ "pluginName": "Test", "mandatory": true, "order": 1}' };
         const event = getSubscribeEvent();
         event.detail.requestParameters.topicArn += '-pre';
+        pluginDal['stage'] = 'pre';
         await pluginManager.addPluginEvent(event);
 
         expect(pluginDal.addPluginInput.length).toBe(1);
@@ -166,6 +167,7 @@ describe('processCloudwatchEvent', () => {
         lambda.reset();
         lambda.invokeRetval = { Payload: '{}'};
         const event = getSubscribeEvent();
+        pluginDal['stage'] = 'pre';
         await pluginManager.addPluginEvent(event);
 
         expect(pluginDal.addPluginInput.length).toBe(1);
@@ -181,6 +183,7 @@ describe('processCloudwatchEvent', () => {
         lambda.reset();
         lambda.invokeRetval = { Payload: 'order: 1'};
         const event = getSubscribeEvent();
+        pluginDal['stage'] = 'pre';
         await pluginManager.addPluginEvent(event);
 
         expect(pluginDal.addPluginInput.length).toBe(1);
@@ -195,6 +198,7 @@ describe('processCloudwatchEvent', () => {
         pluginDal.reset();
         lambda.reset();
         lambda.invokeRetval = { };
+        pluginDal['stage'] = 'pre';
         const event = getSubscribeEvent();
         await pluginManager.addPluginEvent(event);
 
