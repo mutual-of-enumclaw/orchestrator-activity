@@ -67,7 +67,8 @@ export class PluginManager {
             this.pluginDal = new PluginManagementDal(process.env.pluginTable, this.activity, this.stage);
             this.lambda = new Lambda();
         }
-        const pluginDal = this.pluginDal.stage === stage? this.pluginDal : new PluginManagementDal(process.env.pluginTable, this.activity, stage);
+        const pluginDal = this.pluginDal.stage === stage? this.pluginDal : 
+                                    new PluginManagementDal(process.env.pluginTable, this.activity, stage);
         console.log('Invoking Lambda');
         const lambdaResult = await this.lambda.invoke({
             FunctionName: lambdaName,
@@ -115,7 +116,7 @@ export class PluginManager {
 
         console.log('Adding plugin to database');
         await pluginDal.addPlugin(subscriptionArn, 
-                                       {functionName: lambdaName, ...result});
+                                  {functionName: lambdaName, ...result});
         console.log('Plugin add succeeded');
     }
 
