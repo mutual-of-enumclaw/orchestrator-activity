@@ -35,6 +35,7 @@
         "jest": "^25.4.0",
         "jest-junit": "^7.0.0",
         "serverless-iam-roles-per-function": "^1.0.4",
+        "serverless-plugin-generic-stack": "^1.0.2",
         "serverless-plugin-include-dependencies": "^3.2.1",
         "serverless-plugin-tracing": "^2.0.0",
         "serverless-pseudo-parameters": "^2.5.0",

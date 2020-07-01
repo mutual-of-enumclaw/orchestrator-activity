@@ -2,53 +2,76 @@
 # Copyright 2017-2017 Mutual of Enumclaw. All Rights Reserved.
 # License: Public
 #
-service: ${opt:prefix, 'orchestrator'}-${self:custom.activity}
+service: ${opt:prefix, 'orchestrator'}-${opt:activity, 'activity'}
 
 plugins:
   - serverless-webpack
   - serverless-iam-roles-per-function
   - serverless-pseudo-parameters
+  - serverless-plugin-generic-stack
 
 provider:
   name: aws
-  runtime: nodejs10.x
+  runtime: nodejs12.x
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-west-2'}
   versionFunctions: false
   environment:
-    epsagonToken: ${opt:epsagon-token, ''}
-    epsagonAppName: ${opt:epsagon-app-name, ''}
-    epsagonMetadata: ${opt:epsagon-meta, ''}
+    epsagonToken:
+      Ref: EpsagonToken
+    epsagonAppName:
+      Ref: EpsagonAppName
+    epsagonMetadata:
+      Ref: EpsagonMetadata
     statusTable: ${self:custom.core.tables.status.name}
     pluginTable: ${self:custom.core.tables.plugin.name}
-    activity: ${self:custom.activity}
-
+    activity:
+      Fn::Select:
+        - Ref: ActivityNameOffset
+        - Fn::Split:
+            - "-"
+            - Ref: AWS::StackName
+  stackParameters:
+    - ParameterKey: "OrchestratorBaseStack"
+      ParameterValue: ${opt:core-stack, 'orchestrator'}-${self:provider.stage}
+    - ParameterKey: "ActivityNameOffset"
+      ParameterValue: ${opt:nameOffset, '1'}
+    - ParameterKey: "Environment"
+      ParameterValue: ${self:provider.stage}
+    - ParameterKey: EpsagonToken
+      ParameterValue: ${opt:epsagon-token, ''}
+    - ParameterKey: EpsagonAppName
+      ParameterValue: ${opt:epsagon-app-name, ''}
+    - ParameterKey: EpsagonMetadata
+      ParameterValue: ${opt:epsagon-meta, ''}
   stackTags: ${file(./${opt:tagConfig, 'default-tags.yml'})}
-  deploymentBucket: ${opt:deploymentBucket, ''}
+  deploymentBucket: ${opt:deploymentBucket, '${opt:config, ''}'}
   
 custom:
-  activity: ${opt:activity, 'activity'}
-
   core:
-    stack: ${opt:core-stack, 'orchestrator'}
     tables:
       status:
         name:
-          Fn::ImportValue: ${self:custom.core.stack}-${self:provider.stage}-status-name
+          Fn::ImportValue: "#{OrchestratorBaseStack}-status-name"
         arn:
-          Fn::ImportValue: ${self:custom.core.stack}-${self:provider.stage}-status-arn
+          Fn::ImportValue: "#{OrchestratorBaseStack}-status-arn"
         stream:
-          Fn::ImportValue: ${self:custom.core.stack}-${self:provider.stage}-status-stream-arn
+          Fn::ImportValue: "#{OrchestratorBaseStack}-status-stream-arn"
       plugin:
         name:
-          Fn::ImportValue: ${self:custom.core.stack}-${self:provider.stage}-plugin-name
+          Fn::ImportValue: "#{OrchestratorBaseStack}-plugin-name"
         arn:
-          Fn::ImportValue: ${self:custom.core.stack}-${self:provider.stage}-plugin-arn
+          Fn::ImportValue: "#{OrchestratorBaseStack}-plugin-arn"
 
   webpack:
     includeModules:
       forceExclude:
-
+  
+  ParameterTypes:
+    current: ${self:custom.ParameterTypes.${opt:config, 'default'}}
+    serverless: 
+      yml: AWS::SSM::Parameter::Value<String>
+    default: String
 functions:
   asyncStart:
     handler: src/functions/asyncStage.fanOut
@@ -56,7 +79,7 @@ functions:
     environment:
       snsTopic:
         Ref: snsTopic
-    iamRoleStatementsName: ${self:service}-${self:provider.stage}-as-${self:provider.region}-IAM
+    iamRoleStatementsName: "#{AWS::StackName}-as-${self:provider.region}-IAM"
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -77,7 +100,7 @@ functions:
     timeout: 900
     environment:
       stage: pre
-    iamRoleStatementsName: ${self:service}-${self:provider.stage}-pre-${self:provider.region}-IAM
+    iamRoleStatementsName: "#{AWS::StackName}-pre-${self:provider.region}-IAM"
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -97,7 +120,7 @@ functions:
           - logs:CreateLogStream
           - logs:PutLogEvents
         Resource:
-          - arn:aws:logs:${self:provider.region}:#{AWS::AccountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-*
+          - arn:aws:logs:${self:provider.region}:#{AWS::AccountId}:log-group:/aws/lambda/#{AWS::StackName}-*
       - Effect: Allow
         Action:
           - lambda:InvokeFunction
@@ -109,7 +132,7 @@ functions:
     timeout: 900
     environment:
       stage: post
-    iamRoleStatementsName: ${self:service}-${self:provider.stage}-post-${self:provider.region}-IAM
+    iamRoleStatementsName: "#{AWS::StackName}-post-${self:provider.region}-IAM"
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -129,7 +152,7 @@ functions:
           - logs:CreateLogStream
           - logs:PutLogEvents
         Resource:
-          - arn:aws:logs:${self:provider.region}:#{AWS::AccountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-syncPost*
+          - arn:aws:logs:${self:provider.region}:#{AWS::AccountId}:log-group:/aws/lambda/#{AWS::StackName}-syncPost*
       - Effect: Allow
         Action:
           - lambda:InvokeFunction
@@ -360,36 +383,58 @@ functions:
                 - Unsubscribe
 
 resources:
+  Parameters:
+    OrchestratorBaseStack:
+      Type: ${self:custom.ParameterTypes.current}
+      Default: /<EnvironmentName>/orchestrator/base
+    ActivityNameOffset:
+      Type: ${self:custom.ParameterTypes.current}
+      Default: /<EnvironmentName>/orchestrator/activity/nameOffset
+    Environment:
+      Type: ${self:custom.ParameterTypes.current}
+      Default: /<EnvironmentName>/name
+    FailureMetric:
+      Type: ${self:custom.ParameterTypes.current}
+      Default: /<EnvironmentName>/orchestrator/metric
+    EpsagonToken:
+      Type: ${self:custom.ParameterTypes.current}
+      Default: /<EnvironmentName>/epsagon/token
+    EpsagonAppName:
+      Type: ${self:custom.ParameterTypes.current}
+      Default: /<EnvironmentName>/epsagon/app-name
+    EpsagonMetadata:
+      Type: ${self:custom.ParameterTypes.current}
+      Default: /<EnvironmentName>/epsagon/app-name
   Resources:
     snsTopic:
       Type: AWS::SNS::Topic
       Properties:
-        DisplayName: ${self:service}-${self:provider.stage}-async
-        TopicName: ${self:service}-${self:provider.stage}-async
+        DisplayName: "#{AWS::StackName}-async"
+        TopicName: "#{AWS::StackName}-async"
 
     preTopic:
       Type: AWS::SNS::Topic
       Properties:
-        DisplayName: ${self:service}-${self:provider.stage}-pre-sync
-        TopicName: ${self:service}-${self:provider.stage}-pre-sync
+        DisplayName: "#{AWS::StackName}-pre-sync"
+        TopicName: "#{AWS::StackName}-pre-sync"
     postTopic:
       Type: AWS::SNS::Topic
       Properties:
-        DisplayName: ${self:service}-${self:provider.stage}-post-sync
-        TopicName: ${self:service}-${self:provider.stage}-post-sync
+        DisplayName: "#{AWS::StackName}-post-sync"
+        TopicName: "#{AWS::StackName}-post-sync"
 
   Outputs:
     preProcessing:
       Value:
         Ref: preTopic
       Export:
-        Name: ${self:service}-${self:provider.stage}-pre-processing
+        Name: "#{AWS::StackName}-pre-processing"
 
     parallelProcessing:
       Value:
         Ref: snsTopic
       Export:
-        Name: ${self:service}-${self:provider.stage}-parallel-processing
+        Name: "#{AWS::StackName}-parallel-processing"
 
     parallelProcessingName:
       Value:
@@ -397,13 +442,13 @@ resources:
           - snsTopic
           - TopicName
       Export:
-        Name: ${self:service}-${self:provider.stage}-parallel-processing-name
+        Name: "#{AWS::StackName}-parallel-processing-name"
 
     postProcessing:
       Value:
         Ref: postTopic
       Export:
-        Name: ${self:service}-${self:provider.stage}-post-processing
+        Name: "#{AWS::StackName}-post-processing"
 
     asyncStart:
       Value: 
@@ -411,13 +456,13 @@ resources:
           - AsyncStartLambdaFunction
           - Arn
       Export:
-        Name: ${self:service}-${self:provider.stage}-async
+        Name: "#{AWS::StackName}-async"
 
     asyncStartName:
       Value: 
         Ref: AsyncStartLambdaFunction
       Export:
-        Name: ${self:service}-${self:provider.stage}-async-name
+        Name: "#{AWS::StackName}-async-name"
     
     syncPreProcessing:
       Value: 
@@ -425,7 +470,7 @@ resources:
           - SncPreProcLambdaFunction
           - Arn
       Export:
-        Name: ${self:service}-${self:provider.stage}-pre-sync
+        Name: "#{AWS::StackName}-pre-sync"
 
     syncPostProcessing:
       Value: 
@@ -433,7 +478,7 @@ resources:
           - SncPostProcLambdaFunction
           - Arn
       Export:
-        Name: ${self:service}-${self:provider.stage}-post-sync
+        Name: "#{AWS::StackName}-post-sync"
 
     syncPreProcessingRole:
       Value: 
@@ -441,22 +486,22 @@ resources:
           - SncPreProcIamRoleLambdaExecution
           - Arn
       Export:
-        Name: ${self:service}-${self:provider.stage}-pre-process-arn
+        Name: "#{AWS::StackName}-pre-process-arn"
         
     syncPreProcessingRoleName:
       Value: 
         Ref: SncPreProcIamRoleLambdaExecution
       Export:
-        Name: ${self:service}-${self:provider.stage}-pre-process-name
+        Name: "#{AWS::StackName}-pre-process-name"
     syncPostProcessingRole:
       Value: 
         Fn::GetAtt: 
           - SncPostProcIamRoleLambdaExecution
           - Arn
       Export:
-        Name: ${self:service}-${self:provider.stage}-post-process-arn
+        Name: "#{AWS::StackName}-post-process-arn"
     syncPostProcessingRoleName:
       Value: 
         Ref: SncPostProcIamRoleLambdaExecution
       Export:
-        Name: ${self:service}-${self:provider.stage}-post-process-name
+        Name: "#{AWS::StackName}-post-process-name"
