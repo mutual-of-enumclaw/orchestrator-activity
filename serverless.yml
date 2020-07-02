@@ -404,7 +404,7 @@ resources:
       Default: /<EnvironmentName>/epsagon/app-name
     EpsagonMetadata:
       Type: ${self:custom.ParameterTypes.current}
-      Default: /<EnvironmentName>/epsagon/app-name
+      Default: /<EnvironmentName>/epsagon/metadata
   Resources:
     snsTopic:
       Type: AWS::SNS::Topic
