@@ -505,4 +505,3 @@ resources:
         Ref: SncPostProcIamRoleLambdaExecution
       Export:
         Name: "#{AWS::StackName}-post-process-name"
-
