@@ -3,22 +3,21 @@
  * License: Public
  */
 
-import { fanOut, setDal, setSns, setActivityId, setStepFunction } from './asyncStage';
-import { MockSNSUtils, OrchestratorStatusDal } from '../../__mock__/libServices';
+import { fanOut, setServices } from './asyncStage';
+import { MockSNSUtils, OrchestratorStatusDal, OrchestratorPluginDal } from '../../__mock__/libServices';
 import { OrchestratorComponentState } from '@moe-tech/orchestrator';
 import { MockStepFunctions } from '../../__mock__/aws';
 
 const sns = new MockSNSUtils();
 const dal = new OrchestratorStatusDal();
+const pluginDal = new OrchestratorPluginDal();
 const stepfunctions = new MockStepFunctions();
 describe('fanOut', () => {
     process.env.environment = 'unit-test';
-    setActivityId('test');
-    setDal(dal as any);
-    setSns(sns as any);
-    setStepFunction(stepfunctions as any);
+    setServices(stepfunctions, 'test', sns, dal, pluginDal);
 
     beforeEach(() => {
+        pluginDal.reset();
         stepfunctions.reset();
     });
     
@@ -114,42 +113,3 @@ function getDefaultEvent() {
         asyncToken: 'token'
     };
 }
-
-describe('setOrchestratorId', () => {
-    process.env.environment = 'test';
-    test('Invalid Environment', () => {
-        let error = null;
-        try {
-            setActivityId('test');
-        } catch (err) {
-            error = err.message;
-        }
-        expect(error).toBe('A unit test modification is being used outside of the indended environment');
-    });
-});
-
-describe('setDal', () => {
-    process.env.environment = 'test';
-    test('Invalid Environment', () => {
-        let error = null;
-        try {
-            setDal({} as any);
-        } catch (err) {
-            error = err.message;
-        }
-        expect(error).toBe('A unit test modification is being used outside of the indended environment');
-    });
-});
-
-describe('setSns', () => {
-    process.env.environment = 'test';
-    test('Invalid Environment', () => {
-        let error = null;
-        try {
-            setSns({} as any);
-        } catch (err) {
-            error = err.message;
-        }
-        expect(error).toBe('A unit test modification is being used outside of the indended environment');
-    });
-});

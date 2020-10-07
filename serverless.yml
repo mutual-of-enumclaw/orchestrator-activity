@@ -92,6 +92,11 @@ functions:
           - Ref: snsTopic
       - Effect: Allow
         Action:
+          - dynamodb:Query
+        Resource:
+          - ${self:custom.core.tables.plugin.arn}
+      - Effect: Allow
+        Action:
           - states:SendTaskSuccess
         Resource: '*'
 

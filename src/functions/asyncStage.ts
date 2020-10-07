@@ -4,45 +4,31 @@
  */
 
 import { OrchestratorComponentState, OrchestratorStage, stepLambdaAsyncWrapper, OrchestratorStatusDal, 
-    OrchestratorWorkflowStatus, getPluginRegisterTimeout, OrchestratorActivityStatus }
+    OrchestratorWorkflowStatus, getPluginRegisterTimeout, OrchestratorActivityStatus, OrchestratorPluginDal }
     from '@moe-tech/orchestrator';
 import { SNSUtils } from '../utils/snsUtils';
 import { install } from 'source-map-support';
 import { StepFunctions } from 'aws-sdk';
 
+let statusDal: OrchestratorStatusDal = null;
+let pluginDal: OrchestratorPluginDal = null;
+
 install();
 
 let sns: SNSUtils;
-let dal: OrchestratorStatusDal;
 let stepfunctions = new StepFunctions();
 let activity: string = process.env.activity;
 
-export function setStepFunction(value: StepFunctions) {
-    if (process.env.environment !== 'unit-test') {
-        throw new Error('A unit test modification is being used outside of the indended environment');
-    }
-    stepfunctions = value;
-}
-
-export function setActivityId(obj: string) {
-    if (process.env.environment !== 'unit-test') {
-        throw new Error('A unit test modification is being used outside of the indended environment');
-    }
-    activity = obj;
-}
-
-export function setSns(obj: SNSUtils) {
-    if (process.env.environment !== 'unit-test') {
-        throw new Error('A unit test modification is being used outside of the indended environment');
-    }
-    sns = obj;
-}
-
-export function setDal(obj: OrchestratorStatusDal) {
-    if (process.env.environment !== 'unit-test') {
-        throw new Error('A unit test modification is being used outside of the indended environment');
-    }
-    dal = obj;
+export function setServices(stepService: any, 
+                            activityName: string, 
+                            snsUtils: any, 
+                            statusDalService: any,
+                            pluginDalService: any) {
+    stepfunctions = stepService;
+    activity = activityName;
+    sns = snsUtils;
+    statusDal = statusDalService;
+    pluginDal = pluginDalService
 }
 
 interface AsyncParameters {
@@ -51,9 +37,10 @@ interface AsyncParameters {
 }
 
 export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters) => {
-    if (!sns || !dal) {
+    if (!sns || !statusDal) {
         sns = new SNSUtils(process.env.snsTopic);
-        dal = new OrchestratorStatusDal(process.env.statusTable);
+        statusDal = new OrchestratorStatusDal(process.env.statusTable);
+        pluginDal = new OrchestratorPluginDal(process.env.pluginTable, activity);
     }
     
     if(!asyncEvent || !asyncEvent.asyncToken || !asyncEvent.data) {
@@ -67,15 +54,18 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
     if (!event.uid) {
         throw new Error(`Event data unexpected (uid: '${event.uid}')`);
     }
+    
+    console.log('Retrieving registered plugins');
+    const plugins = await pluginDal.getPlugins(OrchestratorStage.BulkProcessing);
 
-    if (await sns.getSubscriberCount() === 0) {
+    if (!plugins || plugins.length === 0 || await sns.getSubscriberCount() === 0) {
         console.log('No subscribers, updating status and returning');
         await stepfunctions.sendTaskSuccess({
             output: JSON.stringify(OrchestratorComponentState.Complete),
             taskToken: asyncEvent.asyncToken
         }).promise();
 
-        await dal.updateStageStatus(
+        await statusDal.updateStageStatus(
             event.uid, event.workflow, activity, OrchestratorStage.BulkProcessing,
             OrchestratorComponentState.Complete, ' ');
 
@@ -83,7 +73,7 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
     }
 
     console.log('Retrieving status object');
-    const overallStatus = await dal.getStatusObject(event.uid, event.metadata.workflow);
+    const overallStatus = await statusDal.getStatusObject(event.uid, event.metadata.workflow);
 
     if (!overallStatus) {
         throw new Error('The status object cannot be found');
@@ -96,6 +86,17 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
     const statusObject: {[key: string]: OrchestratorActivityStatus} = {};
     statusObject[activity] = overallStatus.activities[activity];
 
+    await Promise.all(plugins.filter(x => x.mandatory === true).map((x) => {
+        if(event.activities[activity].async.mandatory[x.pluginName]) {
+            // Handle case where plugin is already registered
+            return;
+        }
+        return statusDal.updatePluginStatus(
+            event.uid, event.workflow,
+            activity, OrchestratorStage.BulkProcessing, true, x.pluginName, 
+            OrchestratorComponentState.NotStarted, ' ');;
+    }));
+
     const globalMetadata = {
         now: new Date().getTime(),
         ...event.metadata,
@@ -104,7 +105,7 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
 
     console.log('Setting activity state to in progress');
     const startTime = new Date();
-    await dal.updateStageStatus(
+    await statusDal.updateStageStatus(
         event.uid, event.workflow, activity, OrchestratorStage.BulkProcessing,
         OrchestratorComponentState.InProgress, ' ', startTime, asyncEvent.asyncToken);
 
@@ -154,20 +155,22 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
     const result = await sns.publishWithMetadata(message, globalMetadata);
     console.log(`publishWithMetadata result: ${JSON.stringify(result)}`);
 
-    const timeout = getPluginRegisterTimeout(overallStatus, activity);
-    await new Promise((resolve) => {
-        setTimeout(
-            () => {
-                resolve();
-            }, 
-            timeout);
-    });
-
-    const updatedStatus = await dal.getStatusObject(event.uid, event.workflow, true);
+    const timeout = getPluginRegisterTimeout(overallStatus, activity, plugins);
+    if(timeout !== 0) {
+        await new Promise((resolve) => {
+            setTimeout(
+                () => {
+                    resolve();
+                }, 
+                timeout);
+        });   
+    }
+    
+    const updatedStatus = await statusDal.getStatusObject(event.uid, event.workflow, true);
 
     if(Object.keys(updatedStatus.activities[activity].async.mandatory).length === 0) {
         console.log('No plugins registered, performing update to move task forward');
-        await dal.updateStageStatus(
+        await statusDal.updateStageStatus(
             event.uid, event.workflow, activity, OrchestratorStage.BulkProcessing,
             OrchestratorComponentState.Complete, ' ', startTime, ' ');
         
