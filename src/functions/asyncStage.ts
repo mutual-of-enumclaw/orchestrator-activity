@@ -87,7 +87,9 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
     statusObject[activity] = overallStatus.activities[activity];
 
     await Promise.all(plugins.filter(x => x.mandatory === true).map((x) => {
-        if(event.activities[activity].async.mandatory[x.pluginName]) {
+        if(event.activities &&
+            event.activities[activity] &&
+            event.activities[activity].async.mandatory[x.pluginName]) {
             // Handle case where plugin is already registered
             return;
         }
