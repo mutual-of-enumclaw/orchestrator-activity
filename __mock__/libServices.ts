@@ -1,5 +1,5 @@
 import { bool } from "aws-sdk/clients/signer";
-import { OrchestratorStage, OrchestratorComponentState } from "@moe-tech/orchestrator";
+import { OrchestratorStage, OrchestratorComponentState, OrchestratorSyncPlugin } from "@moe-tech/orchestrator";
 
 export class MockSNSUtils {
     public subscriberCount: number;
@@ -23,6 +23,24 @@ export class MockSNSUtils {
             metadata
         });
         return this.publishWithMetadataRetval;
+    }
+}
+
+export class OrchestratorPluginDal {
+    public getPlugins = jest.fn();
+    public getPluginsResults: OrchestratorSyncPlugin[];
+
+    public reset() {
+        this.getPluginsResults = [{ 
+            functionName: 'test',
+            pluginName: 'test',
+            mandatory: true,
+            order: 1} as any];
+
+        this.getPlugins.mockReset();
+        this.getPlugins.mockImplementation(async () => {
+            return this.getPluginsResults;
+        });
     }
 }
 

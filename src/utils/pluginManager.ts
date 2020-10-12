@@ -4,7 +4,7 @@
  */
 
 import { PluginManagementDal } from "./pluginManagementDal";
-import { OrchestratorStage } from "@moe-tech/orchestrator";
+import { OrchestratorStage, OrchestratorSyncPlugin } from "@moe-tech/orchestrator";
 import { CloudwatchEvent } from "../types/cloudwatchEvent";
 import { Lambda } from 'aws-sdk';
 import { Stage } from "aws-sdk/clients/amplify";
@@ -95,11 +95,12 @@ export class PluginManager {
         const body = (lambdaResult.Payload)? lambdaResult.Payload.toString() : '{}';
         console.log('Parsing payload: ' + body);
         console.log(body);
-        let result: LambdaResult;
+        let result: OrchestratorSyncPlugin;
         try {
             result = (body)? JSON.parse(body) : {};
             if(result['default'] && result['default'].mandatory !== undefined) {
                 result.mandatory = result['default'].mandatory;
+                result.pluginRegisterTimeout = result['default'].pluginRegisterTimeout;
                 delete result['default'];
             }
             if(result.mandatory === undefined) {
@@ -107,7 +108,7 @@ export class PluginManager {
             }
         } catch (err) {
             console.log(`An error occured parsing the install result for ${lambdaName}. Using default values`, err);
-            result = {} as LambdaResult;
+            result = {} as OrchestratorSyncPlugin;
         }
 
         if(result.order === undefined || result.order === null) {

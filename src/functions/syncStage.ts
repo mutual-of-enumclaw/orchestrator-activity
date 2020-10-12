@@ -4,8 +4,8 @@
  */
 
 import { stepLambdaAsyncWrapper, OrchestratorWorkflowStatus, 
-    OrchestratorStatusDal, OrchestratorStage, OrchestratorComponentState } from '@moe-tech/orchestrator';
-import { OrchestratorPluginDal } from '../utils/orchestratorPluginDal';
+    OrchestratorStatusDal, OrchestratorStage, OrchestratorComponentState, OrchestratorPluginDal } 
+    from '@moe-tech/orchestrator';
 import * as AWS from 'aws-sdk';
 
 let statusDal: OrchestratorStatusDal = null;
@@ -14,30 +14,14 @@ let activity: string = process.env.activity;
 const stage = (process.env.stage === 'pre') ? OrchestratorStage.PreProcessing : OrchestratorStage.PostProcessing;
 let lambda = new AWS.Lambda();
 
-export function setActivityId(obj: string) {
-    if (process.env.environment !== 'unit-test') {
-        throw new Error('A unit test modification is being used outside of the indended environment');
-    }
-    activity = obj;
-}
-export function setStatusDal(obj: OrchestratorStatusDal) {
-    if (process.env.environment !== 'unit-test') {
-        throw new Error('A unit test modification is being used outside of the indended environment');
-    }
-    statusDal = obj;
-}
-export function setPluginDal(obj: OrchestratorPluginDal) {
-    if (process.env.environment !== 'unit-test') {
-        throw new Error('A unit test modification is being used outside of the indended environment');
-    }
-    pluginDal = obj;
-}
-
-export function setLambda(obj: AWS.Lambda) {
-    if (process.env.environment !== 'unit-test') {
-        throw new Error('A unit test modification is being used outside of the indended environment');
-    }
-    lambda = obj;
+export function setServices(activityId: string, 
+                            statusDalService: OrchestratorStatusDal, 
+                            pluginDalService: OrchestratorPluginDal,
+                            lambdaService: AWS.Lambda) {
+    activity = activityId;
+    statusDal = statusDalService;
+    pluginDal = pluginDalService;
+    lambda = lambdaService;
 }
 
 export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowStatus) => {
@@ -56,13 +40,14 @@ export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowSt
         throw new Error(`Event data unexpected (uid: '${event.uid}')`);
     }
 
+    console.log('Setting stage status to InProgress');
     await statusDal.updateStageStatus(event.uid, event.workflow, activity, stage, 
                                       OrchestratorComponentState.InProgress, ' ');
 
     console.log('Retrieving registered plugins');
-    const plugins = await pluginDal.getSyncPlugins(stage);
+    const plugins = await pluginDal.getPlugins(stage);
     if(!plugins || plugins.length === 0) {
-        statusDal.updateStageStatus(event.uid, event.workflow, activity, stage, 
+        await statusDal.updateStageStatus(event.uid, event.workflow, activity, stage, 
                                     OrchestratorComponentState.Complete, ' ');
         return;
     }
@@ -83,7 +68,7 @@ export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowSt
         //
         // Execute all
         //
-        
+
         console.log('Retrieving status object');
         const overallStatus = await statusDal.getStatusObject(event.uid, event.metadata.workflow);
 
