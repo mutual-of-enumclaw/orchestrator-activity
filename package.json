@@ -24,7 +24,7 @@
         "@moe-tech/orchestrator": "^1.0.88",
         "aws-sdk": "^2.612.0",
         "epsagon": "1.17.3",
-        "serverless": "^2.6.0",
+        "serverless": "^2.4.0",
         "xml2js": "^0.4.23"
     },
     "devDependencies": {
@@ -35,7 +35,7 @@
         "hard-source-webpack-plugin": "^0.13.1",
         "jest": "^25.4.0",
         "jest-junit": "^7.0.0",
-        "serverless-iam-roles-per-function": "git+https://github.com/andersquist/serverless-iam-roles-per-function.git",
+        "serverless-iam-roles-per-function": "^2.0.2",
         "serverless-plugin-generic-stack": "^1.0.2",
         "serverless-plugin-include-dependencies": "^3.2.1",
         "serverless-plugin-tracing": "^2.0.0",
