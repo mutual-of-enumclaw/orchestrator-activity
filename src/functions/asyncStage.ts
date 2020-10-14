@@ -28,7 +28,7 @@ export function setServices(stepService: any,
     activity = activityName;
     sns = snsUtils;
     statusDal = statusDalService;
-    pluginDal = pluginDalService
+    pluginDal = pluginDalService;
 }
 
 interface AsyncParameters {
@@ -86,7 +86,7 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
     const statusObject: {[key: string]: OrchestratorActivityStatus} = {};
     statusObject[activity] = overallStatus.activities[activity];
 
-    await Promise.all(plugins.filter(x => x.mandatory === true).map((x) => {
+    await Promise.all(plugins.filter(x => x.mandatory).map((x) => {
         if(event.activities &&
             event.activities[activity] &&
             event.activities[activity].async.mandatory[x.pluginName]) {
@@ -96,7 +96,7 @@ export const fanOut = stepLambdaAsyncWrapper(async (asyncEvent: AsyncParameters)
         return statusDal.updatePluginStatus(
             event.uid, event.workflow,
             activity, OrchestratorStage.BulkProcessing, true, x.pluginName, 
-            OrchestratorComponentState.NotStarted, ' ');;
+            OrchestratorComponentState.NotStarted, ' ');
     }));
 
     const globalMetadata = {
