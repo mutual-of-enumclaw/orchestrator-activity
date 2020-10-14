@@ -4,7 +4,8 @@
  */
 
 import { stepLambdaAsyncWrapper, OrchestratorWorkflowStatus, 
-    OrchestratorStatusDal, OrchestratorStage, OrchestratorComponentState, OrchestratorPluginDal } 
+    OrchestratorStatusDal, OrchestratorStage, OrchestratorComponentState, 
+    OrchestratorPluginDal, OrchestratorStatus, OrchestratorSyncPlugin } 
     from '@moe-tech/orchestrator';
 import * as AWS from 'aws-sdk';
 
@@ -22,6 +23,18 @@ export function setServices(activityId: string,
     statusDal = statusDalService;
     pluginDal = pluginDalService;
     lambda = lambdaService;
+}
+
+function getPluginStatus(overallStatus: OrchestratorWorkflowStatus, 
+                         plugin: OrchestratorSyncPlugin) : OrchestratorStatus {
+    if(overallStatus.activities &&
+        overallStatus.activities[activity] &&
+        overallStatus.activities[activity][stage] &&
+        overallStatus.activities[activity][stage][plugin.mandatory? 'mandatory' : 'optional'] &&
+        overallStatus.activities[activity][stage][plugin.mandatory? 'mandatory' : 'optional'][plugin.pluginName]) {
+        return overallStatus.activities[activity][stage][plugin.mandatory? 'mandatory' : 'optional'][plugin.pluginName];
+    }
+    return {} as OrchestratorStatus;
 }
 
 export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowStatus) => {
@@ -48,29 +61,33 @@ export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowSt
     const plugins = await pluginDal.getPlugins(stage);
     if(!plugins || plugins.length === 0) {
         await statusDal.updateStageStatus(event.uid, event.workflow, activity, stage, 
-                                    OrchestratorComponentState.Complete, ' ');
+                                          OrchestratorComponentState.Complete, ' ');
         return;
     }
 
     console.log(`Retrieved plugins (${plugins ? plugins.length : 0})`);
 
     try {
+        console.log('Retrieving status object');
+        let overallStatus = await statusDal.getStatusObject(event.uid, event.metadata.workflow);
+        const stageStatus = overallStatus.activities[activity][stage];
+
         //
         // Register plugins as not started
         //
         await Promise.all(plugins.map(item => {
-            return statusDal.updatePluginStatus(
-                event.uid, event.workflow,
-                activity, stage, item.mandatory, item.pluginName, 
-                OrchestratorComponentState.NotStarted, ' ');
+            if(getPluginStatus(overallStatus, item).state !== OrchestratorComponentState.Complete) {
+                return statusDal.updatePluginStatus(
+                    event.uid, event.workflow,
+                    activity, stage, item.mandatory, item.pluginName, 
+                    OrchestratorComponentState.NotStarted, ' ');        
+            }
         }));
 
         //
         // Execute all
         //
-
-        console.log('Retrieving status object');
-        const overallStatus = await statusDal.getStatusObject(event.uid, event.metadata.workflow);
+        overallStatus = await statusDal.getStatusObject(event.uid, event.metadata.workflow);
 
         if (!overallStatus) {
             throw new Error('The status object cannot be found');
@@ -122,15 +139,18 @@ export const start = stepLambdaAsyncWrapper(async (event: OrchestratorWorkflowSt
                 error = null;
                 retryCount++;
                 try {
-                    const result = await lambda.invoke({
-                        FunctionName: plugin.functionName,
-                        Payload: JSON.stringify(snsMessage)
-                    }).promise();
+                    const status = getPluginStatus(overallStatus, plugin);
+                    if(status.state !== OrchestratorComponentState.Complete) {
+                        const result = await lambda.invoke({
+                            FunctionName: plugin.functionName,
+                            Payload: JSON.stringify(snsMessage)
+                        }).promise();
 
-                    if (result.FunctionError) {
-                        throw new Error(result.FunctionError as string);
-                    } else if ((result.Payload && result.Payload.toString().match(/Error:.+/))) {
-                        throw new Error(result.Payload.toString());
+                        if (result.FunctionError) {
+                            throw new Error(result.FunctionError as string);
+                        } else if ((result.Payload && result.Payload.toString().match(/Error:.+/))) {
+                            throw new Error(result.Payload.toString());
+                        }
                     }
                 } catch (err) {
                     error = err;

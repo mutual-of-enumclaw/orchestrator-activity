@@ -88,6 +88,11 @@ describe('start test', () => {
             activities: {
                 test: {
                     post: {
+                        mandatory: {
+                            test: {
+                                state: OrchestratorComponentState.NotStarted
+                            }
+                        },
                         status: {
                             state: OrchestratorComponentState.Complete
                         }
@@ -113,8 +118,13 @@ describe('start test', () => {
             activities: {
                 test: {
                     post: {
+                        mandatory: {
+                            test: {
+                                state: OrchestratorComponentState.NotStarted
+                            }
+                        },
                         status: {
-                            state: OrchestratorComponentState.Complete
+                            state: OrchestratorComponentState.Error
                         }
                     }
                 }
